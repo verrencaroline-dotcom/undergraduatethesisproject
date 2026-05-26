@@ -114,105 +114,185 @@ gsh_ids <- gsh_annot$gene_id
 ##removing version . so that gene_ids match
 gsh_ids <- gsub("\\..*", "", gsh_ids)
 
-##
+# Remove version numbers from the row names of the expression matrix
 rownames(exp) <- sub("\\..*", "", rownames(exp))
+
+
+# Convert the expression data frame into a numeric matrix
 exp_mat <- as.matrix(exp)
 mode(exp_mat) <- "numeric"
+
+
+# Remove genes with zero variance across all samples
 exp_mat <- exp_mat[rowVars(exp_mat) > 0, ]
 
-## 
+
+# Keep only glutathione-related genes that are present in the expression matrix
 gsh_ids <- intersect(gsh_ids, rownames(exp_mat))
+
+
+# Check how many glutathione-related genes are available for ssGSEA analysis
 length(gsh_ids)
-##
+
+
+# Create a gene set list for ssGSEA
 gene_sets <- list(
   Glutathione_Metabolism = gsh_ids
 )
 
-##
+
+# Create the ssGSEA parameter object
 ssgsea_param <- ssgseaParam(
   expr = exp_mat,
   geneSets = gene_sets
 )
+
+
+# Run ssGSEA using the GSVA package
 ssgsea_scores <- gsva(ssgsea_param)
-##
+
+
+# Check the dimensions of the ssGSEA score matrix
 dim(ssgsea_scores)
+
+
+# View the first few ssGSEA scores
 head(ssgsea_scores)
 
-###################################################################
-##
-iden <- read.table("D:/Thesis/Raw Data/TCGA_GTEX_category.txt", header = TRUE, sep = "\t")
 
-##
+###################################################################
+# Compare glutathione metabolism ssGSEA scores between normal and tumor breast samples
+
+# Import sample category information for TCGA and GTEx samples
+iden <- read.table(
+  "D:/Thesis/Raw Data/TCGA_GTEX_category.txt",
+  header = TRUE,
+  sep = "\t"
+)
+
+
+# Select sample IDs corresponding to normal breast tissue from GTEx
 normal_breast_samples <- iden$sample[
   iden$TCGA_GTEX_main_category == "GTEX Breast"
 ]
+
+
+# Subset ssGSEA scores to include only normal breast samples
 ssgsea_normal_breast <- ssgsea_scores[
   , colnames(ssgsea_scores) %in% normal_breast_samples
 ]
+
+
+# View the normal breast ssGSEA scores
 head(ssgsea_normal_breast)
 
-##
+
+# Select sample IDs corresponding to breast cancer samples from TCGA
 tumor_breast_samples <- iden$sample[
   iden$TCGA_GTEX_main_category == "TCGA Breast Invasive Carcinoma"
 ]
+
+
+# Subset ssGSEA scores to include only tumor breast samples
 ssgsea_tumor_breast <- ssgsea_scores[
   , colnames(ssgsea_scores) %in% tumor_breast_samples
 ]
+
+
+# View the tumor breast ssGSEA scores
 head(ssgsea_tumor_breast)
 
-##
+
+# Create a data frame containing ssGSEA scores and sample group labels
 df_ssgsea <- data.frame(
   score = c(ssgsea_normal_breast, ssgsea_tumor_breast),
   group = factor(
-    c(rep("Normal", length(ssgsea_normal_breast)),
-      rep("Tumor",  length(ssgsea_tumor_breast))),
+    c(
+      rep("Normal", length(ssgsea_normal_breast)),
+      rep("Tumor",  length(ssgsea_tumor_breast))
+    ),
     levels = c("Normal", "Tumor")
   )
 )
 
-##
+
+# Perform a Wilcoxon rank-sum test
 wilcox.test(score ~ group, data = df_ssgsea)
 
-##
+
+# Calculate the median ssGSEA score for each group
 tapply(df_ssgsea$score, df_ssgsea$group, median)
 
-##
-library()
+
+# Create a boxplot comparing glutathione metabolism ssGSEA scores between normal and tumor breast samples
 ggplot(df_ssgsea, aes(x = group, y = score, fill = group)) +
+  
+  # Add boxplots to show the median, quartiles, and overall distribution
   geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+  
+  # Add jittered points to show individual sample ssGSEA scores
   geom_jitter(width = 0.2, size = 1.2, alpha = 0.6) +
+  
+  # Add Wilcoxon test p-value to the plot
   stat_compare_means(
     method = "wilcox.test",
     label = "p.format"
   ) +
+  
+  # Use a clean classic theme
   theme_classic() +
+  
+  # Add plot title and axis labels
   labs(
     title = "Glutathione Metabolism ssGSEA Scores",
     y = "ssGSEA score",
     x = ""
   ) +
+  
+  # Remove the legend because the x-axis already shows the groups
   theme(legend.position = "none")
 
-## 
+
+# Create a data frame containing ssGSEA scores for normal breast samples only
 df_normal_ssgsea <- data.frame(
-  SampleID = names(ssgsea_normal_breast),
+  SampleID = colnames(ssgsea_normal_breast),
   Glutathione_Metabolism = as.numeric(ssgsea_normal_breast)
 )
 
-## 
-write.csv(df_normal_ssgsea, 
-          file = "Normal_Breast_ssGSEA.csv", 
-          row.names = FALSE)
 
-##
-shapiro_test <- shapiro.test(ssgsea_normal_breast)
-qqnorm(ssgsea_normal_breast, main = "QQ Plot: Normal Breast ssGSEA Scores")
-qqline(ssgsea_normal_breast, col = "red", lwd = 2)
+# Export the normal breast ssGSEA scores as a CSV file
+write.csv(
+  df_normal_ssgsea,
+  file = "Normal_Breast_ssGSEA.csv",
+  row.names = FALSE
+)
 
-hist(ssgsea_normal_breast,
-     breaks = 15,          # adjust number of bins
-     col = "grey",
-     border = "black",
-     main = "Histogram: Normal Breast ssGSEA Scores",
-     xlab = "Glutathione Metabolism ssGSEA Score",
-     ylab = "Frequency")
+
+# Test whether normal breast ssGSEA scores follow a normal distribution
+shapiro_test <- shapiro.test(as.numeric(ssgsea_normal_breast))
+
+
+# Create a QQ plot to visually assess normality of normal breast ssGSEA scores
+qqnorm(
+  as.numeric(ssgsea_normal_breast),
+  main = "QQ Plot: Normal Breast ssGSEA Scores"
+)
+
+# Add a reference line to the QQ plot
+qqline(
+  as.numeric(ssgsea_normal_breast),
+  col = "red",
+  lwd = 2
+)
+
+
+# Create a histogram to visualize the distribution of normal breast ssGSEA scores
+hist(
+  as.numeric(ssgsea_normal_breast),
+  breaks = 15,
+  col = "grey",
+  border = "black",
+  main = "Histogram: Normal Breast ssGSEA Scores",
+  xlab = "Glutathione Metabolism ssGSEA Score",
+  ylab = "Frequency"
+)

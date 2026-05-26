@@ -316,7 +316,7 @@ p_values <- p_values %>%
 #  Merge the p-value labels back into the long-format expression data
 bp_long <- merge(bp_long, p_values[, c("Probe", "label")], by = "Probe")
 
-# reate boxplots comparing expression levels between Tumor and Normal samples
+# Create boxplots comparing expression levels between Tumor and Normal samples
 boxplot <- ggplot(bp_long, aes(x = Group, y = Expression, fill = Group)) +
   geom_boxplot(alpha = 0.7, outlier.shape = NA) +
   geom_jitter(position = position_jitter(0.2), size = 0.5, alpha = 0.6) +

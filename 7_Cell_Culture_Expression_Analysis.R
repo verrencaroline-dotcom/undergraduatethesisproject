@@ -3,39 +3,107 @@ library(data.table)
 library(dplyr)
 library(ggplot2)
 
-exprACAP <- fread(
+# Import lncRNA-X expression data from the DepMap expression file
+expr_X <- fread(
   "D:/Thesis/Downstream Analysis/OmicsExpressionTPMLogp1HumanAllGenes.csv",
-  select = c("ModelID", "ACAP2-IT1 (100874306)")
-  )
-exprRBM <- fread(
-  "D:/Thesis/Downstream Analysis/OmicsExpressionTPMLogp1HumanAllGenes.csv",
-  select = c("ModelID", "RBM5-AS1 (100775107)")
-  )
+  select = c("ModelID", "gene id")
+)
 
+
+# Import lncRNA-Y expression data from the DepMap expression file
+expr_Y <- fread(
+  "D:/Thesis/Downstream Analysis/OmicsExpressionTPMLogp1HumanAllGenes.csv",
+  select = c("ModelID", "gene id")
+)
+
+# Import cell line metadata
 meta <- fread("D:/Thesis/Downstream Analysis/model.csv")
 
-breast_lines <- meta[OncotreeLineage == "Breast"]
 
-expr_acap_meta <- merge(exprACAP, meta, by = "ModelID")
-expracapmetaorder <- expr_acap_meta[order(-expr_acap_meta$`ACAP2-IT1 (100874306)`), ]
-expr_rbm_meta <- merge(exprRBM, meta, by = "ModelID")
-exprrbmmetaorder <- expr_rbm_meta[order(-expr_rbm_meta$`RBM5-AS1 (100775107)`), ]
+# Filter metadata to include only breast cancer cell lines
+breast_lines <- meta %>%
+  filter(OncotreeLineage == "Breast")
 
-ggplot(expr_acap_meta, aes(x = reorder(CellLineName, `ACAP2-IT1 (100874306)`), 
-                           +                            y = `ACAP2-IT1 (100874306)`)) +
+
+# Merge lncRNA-X expression data with breast cancer cell line metadata
+expr_X_meta <- merge(
+  expr_X,
+  breast_lines,
+  by = "ModelID"
+)
+
+
+# Rank breast cancer cell lines from highest to lowest lncRNA-X expression
+expr_X_meta_order <- expr_X_meta %>%
+  arrange(desc(lncRNA_X))
+
+
+# Merge lncRNA-Y expression data with breast cancer cell line metadata
+expr_Y_meta <- merge(
+  expr_Y,
+  breast_lines,
+  by = "ModelID"
+)
+
+
+# Rank breast cancer cell lines from highest to lowest lncRNA-Y expression
+expr_Y_meta_order <- expr_Y_meta %>%
+  arrange(desc(lncRNA_Y))
+
+
+# Plot lncRNA-X expression across breast cancer cell lines
+ggplot(
+  expr_X_meta,
+  aes(
+    x = reorder(CellLineName, lncRNA_X),
+    y = lncRNA_X
+  )
+) +
   geom_bar(stat = "identity", fill = "red") +
-  coord_flip() +  # flips axes so cell lines are on y-axis (easier to read)
-  labs(title = "ACAP2-IT1 Expression Across 71 Breast Cancer Cell Lines",
-             x = "Cell Line",
-             y = "Expression (FPKM or TPM)") +
+  
+  # Flip axes so that cell line names are easier to read
+  coord_flip() +
+  
+  # Add plot title and axis labels
+  labs(
+    title = "lncRNA-X Expression Across Breast Cancer Cell Lines",
+    x = "Cell Line",
+    y = "Expression, log2(TPM + 1)"
+  ) +
+  
+  # Use a clean minimal theme
   theme_minimal(base_size = 12) +
-  theme(axis.text.y = element_text(size = 7))
-ggplot(expr_rbm_meta, aes(x = reorder(CellLineName, `RBM5-AS1 (100775107)`), 
-                          y = `RBM5-AS1 (100775107)`)) +
+  
+  # Reduce y-axis text size because many cell lines are shown
+  theme(
+    axis.text.y = element_text(size = 7)
+  )
+
+
+# Plot lncRNA-Y expression across breast cancer cell lines
+ggplot(
+  expr_Y_meta,
+  aes(
+    x = reorder(CellLineName, lncRNA_Y),
+    y = lncRNA_Y
+  )
+) +
   geom_bar(stat = "identity", fill = "steelblue") +
-  coord_flip() +  # flips axes so cell lines are on y-axis (easier to read)
-  labs(title = "RBM5 AS1 Expression Across 71 Breast Cancer Cell Lines",
-             x = "Cell Line",
-             y = "Expression (FPKM or TPM)") +
+  
+  # Flip axes so that cell line names are easier to read
+  coord_flip() +
+  
+  # Add plot title and axis labels
+  labs(
+    title = "lncRNA-Y Expression Across Breast Cancer Cell Lines",
+    x = "Cell Line",
+    y = "Expression, log2(TPM + 1)"
+  ) +
+  
+  # Use a clean minimal theme
   theme_minimal(base_size = 12) +
-  theme(axis.text.y = element_text(size = 7))
+  
+  # Reduce y-axis text size because many cell lines are shown
+  theme(
+    axis.text.y = element_text(size = 7)
+  )
