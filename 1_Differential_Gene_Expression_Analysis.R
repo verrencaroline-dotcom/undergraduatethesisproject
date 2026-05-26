@@ -223,18 +223,19 @@ sum(is.na(lnc_DEGs$gene_name))
 #write.csv(missing,"./res/unknown.csv")
 
 ##################################################
-### note not yet! 22 october
-#volcano plot for DGE lncRNAs in tumor vs normal tissue
+#Volcano plot for differentially expressed lncRNAs in tumor vs normal tissue
 library(EnhancedVolcano)
+
+# Select the top 10 lncRNAs with the smallest adjusted p-values
 top<-head(lnc_DEGs[order(lnc_DEGs$adj.P.Val),], 10)
 
-## 
+# Replace extremely small raw p-values with 1e-50
 lnc_DEGs$P.Value[lnc_DEGs$P.Value < 1e-50] <- 1e-50
 
-##
+# Open a new plotting window with a specified width and height
 dev.new(width = 8, height = 6)
 
-##
+# Generate the volcano plot showing differential expression of lncRNAs
 EnhancedVolcano(
   lnc_DEGs,
   lab = lnc_DEGs$gene_name,
@@ -263,43 +264,46 @@ EnhancedVolcano(
   subtitleLabSize = 9,
   axisLabSize = 10
 )
-##
+
+# Save the volcano plot as a high-resolution PNG & PDF file
 ggsave("volcano_plot.png", width = 8, height = 6, dpi = 300)
 ggsave("volcano_plot.pdf", width = 8, height = 6, dpi = 300)
 
 rm(top)
 
-##boxplot towards subset of significant genes
+# Boxplot of expression levels for selected significant lncRNAs
 library(reshape2)
 library(ggplot2)
-##selecting top 10 genes
+
+# Select the top 10 significant genes based on adjusted p-value
 top <- head(sig_genes[order(sig_genes$adj.P.Val), "gene_id"], 10)
 
-## subsets/chooses expression data for the top 10 previously chosen genes
+# Subset the expression matrix to include only the selected top 10 genes
 bp_dat <- exp[top, ]
 bp_dat$Probe <- rownames(bp_dat)
 
-## merging annotation data + get rids of version numbers at the end like .1 etc. 
+# Merge expression data with lncRNA annotation data
 bp_dat$Probe <- sub("\\.\\d+$", "", bp_dat$Probe)  
 bp_dat <- merge(bp_dat, lnc_annot[, c("gene_id", "gene_name")],
                 by.x = "Probe", by.y = "gene_id", all.x = TRUE)
 head(bp_dat[, c("Probe", "gene_name")])
 
-##reshaping to long format for ggplot
+# Reshape the expression data from wide format to long format for plotting with ggplot2
 bp_long <- melt(bp_dat, id.vars = c("Probe", "gene_name"), 
                 variable.name = "Sample", value.name = "Expression")
 
-## add sample group information. containing TCGA = Tumor, otherwise normal
+# Add sample group information
 bp_long$Group <- ifelse(grepl("TCGA", bp_long$Sample), "Tumor", "Normal")
 
-##perform t-tests per gene
+# Perform independent t-tests for each gene
 p_values <- bp_long %>%
   group_by(Probe, gene_name) %>%
   summarize(
     pvalue = tryCatch(t.test(Expression ~ Group)$p.value, error = function(e) NA),
     .groups = "drop"
   )
-##Format labels with p-values. creates facet label including gene name and t-test p-value. 
+
+# Create facet labels containing the gene name and corresponding t-test p-value 
 p_values <- p_values %>%
   mutate(
     label = ifelse(
@@ -309,10 +313,10 @@ p_values <- p_values %>%
     )
   )
 
-##Merge labels back into long data 
+#  Merge the p-value labels back into the long-format expression data
 bp_long <- merge(bp_long, p_values[, c("Probe", "label")], by = "Probe")
 
-##Create boxplot
+# reate boxplots comparing expression levels between Tumor and Normal samples
 boxplot <- ggplot(bp_long, aes(x = Group, y = Expression, fill = Group)) +
   geom_boxplot(alpha = 0.7, outlier.shape = NA) +
   geom_jitter(position = position_jitter(0.2), size = 0.5, alpha = 0.6) +
